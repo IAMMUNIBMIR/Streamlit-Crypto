@@ -55,6 +55,7 @@ def get_data(cryptos, currency):
     except Exception as e:
         return pd.DataFrame(), f"Error in get_data(): {str(e)}"
 
+
 # Function to prepare data for XGBoost
 def prepare_data(data, time_step=60):
     try:
