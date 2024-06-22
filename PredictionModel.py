@@ -110,8 +110,8 @@ if crypto_options:
     if cryptos and currency and st.button('Show Predictions'):
         st.header(f'{cryptos}-{currency}')
 
-        coinprices = get_data(cryptos, currency)
-        if not coinprices.empty:
+        coinprices, error_message = get_data(cryptos, currency)
+        if coinprices is not None:
 
             # Use the column name directly for selected cryptocurrency
             selected_column = f'{cryptos}-{currency}'
@@ -197,4 +197,3 @@ if crypto_options:
                             st.error(f"Error during model training or prediction: {e}")
             else:
                 st.error(f"No data found for {cryptos}-{currency}")
-
