@@ -26,7 +26,7 @@ def get_data(cryptos, currency):
     try:
         all_cryptos_df = Cryptocurrencies().find_crypto_pairs()
         if pair not in all_cryptos_df['id'].values:
-            return None, f"{pair} not found in available cryptocurrency pairs."
+            return pd.DataFrame(), f"{pair} not found in available cryptocurrency pairs."
 
         coinprices = pd.DataFrame()
         start_date = date(2020, 1, 1)
@@ -40,12 +40,12 @@ def get_data(cryptos, currency):
                     break
                 coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)  # Concatenate along rows (axis=0)
             except Exception as e:
-                return None, f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
+                return pd.DataFrame(), f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
 
             start_date += delta
 
         if coinprices.empty:
-            return None, f"No data available for {pair} from {date(2020, 1, 1)} to {date.today()}"
+            return pd.DataFrame(), f"No data available for {pair} from {date(2020, 1, 1)} to {date.today()}"
 
         coinprices.index = pd.to_datetime(coinprices.index)
         coinprices = coinprices.ffill()
@@ -53,7 +53,7 @@ def get_data(cryptos, currency):
         return coinprices, None
     
     except Exception as e:
-        return None, str(e)
+        return pd.DataFrame(), f"Error in get_data(): {str(e)}"
 
 # Function to prepare data for XGBoost
 def prepare_data(data, time_step=60):
@@ -111,7 +111,7 @@ if crypto_options:
         st.header(f'{cryptos}-{currency}')
 
         coinprices, error_message = get_data(cryptos, currency)
-        if coinprices is not None:
+        if not coinprices.empty:
 
             # Use the column name directly for selected cryptocurrency
             selected_column = f'{cryptos}-{currency}'
@@ -197,3 +197,5 @@ if crypto_options:
                             st.error(f"Error during model training or prediction: {e}")
             else:
                 st.error(f"No data found for {cryptos}-{currency}")
+        else:
+            st.error(f"Error retrieving data: {error_message}")
