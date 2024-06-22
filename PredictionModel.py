@@ -24,37 +24,36 @@ def get_available_currencies():
 def get_data(cryptos, currency):
     pair = f'{cryptos}-{currency}'
     try:
-        # Check if pair exists
         all_cryptos_df = Cryptocurrencies().find_crypto_pairs()
         if pair not in all_cryptos_df['id'].values:
-            st.error(f"{pair} not found in available cryptocurrency pairs. Please choose a different pair.")
-            return pd.DataFrame()
+            return None, f"{pair} not found in available cryptocurrency pairs."
 
-        st.write(f"Fetching data for {pair}")
-
-        # Initialize an empty DataFrame to accumulate data
         coinprices = pd.DataFrame()
-
-        # Fetch historical data in chunks of 1000 rows to avoid large API responses
         start_date = date(2020, 1, 1)
         end_date = date.today()
-        delta = timedelta(days=1000)
+        delta = timedelta(days=100)
 
         while start_date < end_date:
-            tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), (start_date + delta).strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
-            if tmp.empty:
-                break
-            coinprices = pd.concat([coinprices, pd.DataFrame({pair: tmp['close']})])
+            try:
+                tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), (start_date + delta).strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
+                if tmp.empty:
+                    break
+                coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)  # Concatenate along rows (axis=0)
+            except Exception as e:
+                return None, f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
+
             start_date += delta
 
-        coinprices.index = pd.to_datetime(coinprices.index)
-        coinprices = coinprices.ffill()  # Fill missing values
-        st.write(f"Data fetched successfully for {pair}. Shape: {coinprices.shape}")
-        return coinprices
+        if coinprices.empty:
+            return None, f"No data available for {pair} from {date(2020, 1, 1)} to {date.today()}"
 
+        coinprices.index = pd.to_datetime(coinprices.index)
+        coinprices = coinprices.ffill()
+        
+        return coinprices, None
+    
     except Exception as e:
-        st.error(f"Error fetching data: {e}")
-        return pd.DataFrame()
+        return None, str(e)
 
 # Function to prepare data for XGBoost
 def prepare_data(data, time_step=60):
