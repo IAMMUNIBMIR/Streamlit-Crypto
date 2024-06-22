@@ -24,42 +24,37 @@ def get_available_currencies():
 def get_data(cryptos, currency):
     pair = f'{cryptos}-{currency}'
     try:
+        # Check if pair exists
         all_cryptos_df = Cryptocurrencies().find_crypto_pairs()
         if pair not in all_cryptos_df['id'].values:
-            print(f"{pair} not found in available cryptocurrency pairs.")
-            return pd.DataFrame(), f"{pair} not found in available cryptocurrency pairs."
+            st.error(f"{pair} not found in available cryptocurrency pairs. Please choose a different pair.")
+            return pd.DataFrame()
 
+        st.write(f"Fetching data for {pair}")
+
+        # Initialize an empty DataFrame to accumulate data
         coinprices = pd.DataFrame()
+
+        # Fetch historical data in chunks of 1000 rows to avoid large API responses
         start_date = date(2020, 1, 1)
         end_date = date.today()
-        delta = timedelta(days=100)
+        delta = timedelta(days=1000)
 
         while start_date < end_date:
-            try:
-                print(f"Fetching data for {pair} between {start_date} and {start_date + delta}")
-                tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), (start_date + delta).strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
-                if tmp.empty:
-                    print(f"No data fetched for {pair} between {start_date} and {start_date + delta}")
-                    break
-                coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)  # Concatenate along rows (axis=0)
-            except Exception as e:
-                print(f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}")
-                return pd.DataFrame(), f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
-
+            tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), (start_date + delta).strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
+            if tmp.empty:
+                break
+            coinprices = pd.concat([coinprices, pd.DataFrame({pair: tmp['close']})])
             start_date += delta
 
-        if coinprices.empty:
-            print(f"No data available for {pair} from {date(2020, 1, 1)} to {date.today()}")
-            return pd.DataFrame(), f"No data available for {pair} from {date(2020, 1, 1)} to {date.today()}"
-
         coinprices.index = pd.to_datetime(coinprices.index)
-        coinprices = coinprices.ffill()
-        
-        return coinprices, None
-    
+        coinprices = coinprices.ffill()  # Fill missing values
+        st.write(f"Data fetched successfully for {pair}. Shape: {coinprices.shape}")
+        return coinprices
+
     except Exception as e:
-        print(f"Error in get_data(): {str(e)}")
-        return pd.DataFrame(), f"Error in get_data(): {str(e)}"
+        st.error(f"Error fetching data: {e}")
+        return pd.DataFrame()
 
 # Function to prepare data for XGBoost
 def prepare_data(data, time_step=60):
@@ -116,7 +111,7 @@ if crypto_options:
     if cryptos and currency and st.button('Show Predictions'):
         st.header(f'{cryptos}-{currency}')
 
-        coinprices, error_message = get_data(cryptos, currency)
+        coinprices = get_data(cryptos, currency)
         if not coinprices.empty:
 
             # Use the column name directly for selected cryptocurrency
@@ -164,12 +159,42 @@ if crypto_options:
                                 model.fit(X, y)
 
                             # Make future predictions
-                            future_predictions = predict_future(model, data, scaler)
-                            if future_predictions is not None:
-                                st.header("Future Price Predictions")
-                                st.line_chart(pd.DataFrame({'Predicted Prices': future_predictions}))
-                        except Exception as e:
-                            st.error(f"Error training model or making predictions: {e}")
+                            future_predictions = predict_future(model, data[-60:], scaler)
 
-        else:
-            st.warning(error_message)
+                            if future_predictions is not None:
+                                # Concatenate dates and prices for plot
+                                future_dates = pd.date_range(start=coinprices.index[-1], periods=len(future_predictions)+1, freq='D')[1:]
+                                historical_prices = coinprices[selected_column].values.flatten()
+                                combined_prices = np.concatenate((historical_prices, future_predictions))
+
+                                combined_dates = pd.Index(list(coinprices.index) + list(future_dates))
+
+                                # Plot using Plotly Express
+                                fig = px.line(
+                                    x=combined_dates,
+                                    y=combined_prices,
+                                    labels={"x": "Date", "y": "Price"},
+                                    title=f'{cryptos}-{currency} Price Prediction'
+                                )
+                                # Update layout for dark theme
+                                fig.update_layout(
+                                    template='plotly_dark',
+                                    xaxis=dict(
+                                        gridcolor='rgb(75, 75, 75)',
+                                        tickfont=dict(color='white'),
+                                        title=dict(text='Date', font=dict(color='white'))
+                                    ),
+                                    yaxis=dict(
+                                        gridcolor='rgb(75, 75, 75)',
+                                        tickfont=dict(color='white'),
+                                        title=dict(text='Price', font=dict(color='white'))
+                                    ),
+                                    plot_bgcolor='rgba(0,0,0,0)',
+                                    paper_bgcolor='rgba(0,0,0,0)',
+                                    font=dict(color='white')
+                                )
+                                st.plotly_chart(fig)
+                        except Exception as e:
+                            st.error(f"Error during model training or prediction: {e}")
+            else:
+                st.error(f"No data found for {cryptos}-{currency}")
