@@ -30,7 +30,7 @@ def get_data(cryptos, currency):
         coinprices = []
         start_date = date(2020, 1, 1)
         end_date = date.today()
-        delta = timedelta(days=100)
+        delta = timedelta(days=1)
 
         while start_date < end_date:
             try:
@@ -40,7 +40,7 @@ def get_data(cryptos, currency):
                     continue
                 coinprices.append(tmp[['close']])
             except Exception as e:
-                return None, f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
+                st.error(f"Error fetching data for {pair} on {start_date}: {str(e)}")
             start_date += delta
 
         if not coinprices:
