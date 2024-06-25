@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from xgboost import XGBRegressor
-from datetime import date
+from datetime import date, timedelta
 
 # Set up Streamlit for user inputs
 st.title('Cryptocurrency Price Prediction')
@@ -27,26 +27,29 @@ def get_data(cryptos, currency):
         if pair not in all_cryptos_df['id'].values:
             return None, f"{pair} not found in available cryptocurrency pairs."
 
-        # Find the earliest available date
-        start_date = date(2020, 1, 1)  # Default start date
-        try:
-            sample_data = HistoricalData(pair, 60*60*24, '2020-01-01-00-00', date.today().strftime('%Y-%m-%d-%H-%M'), verbose=False).retrieve_data()
-            if not sample_data.empty:
-                start_date = sample_data.index.min().date()
-        except Exception as e:
-            st.warning(f"Could not determine the earliest available date for {pair}: {e}")
+        coinprices = pd.DataFrame()
+        start_date = date(2020, 1, 1)
+        end_date = date.today()
+        delta = timedelta(days=100)
 
-        # Fetch data from the start date to today
-        try:
-            coinprices = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), date.today().strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
-            if coinprices.empty or 'close' not in coinprices.columns:
-                return None, f"No data available for {pair} from {start_date} to {date.today()}"
+        while start_date < end_date:
+            try:
+                tmp = HistoricalData(pair, 60*60*24, '2020-01-01-00-00', date.today().strftime('%Y-%m-%d-%H-%M'), verbose=False).retrieve_data()
+                if tmp.empty or 'close' not in tmp.columns:
+                    start_date += delta
+                    continue
+                coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)
+            except Exception as e:
+                return None, f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
+            start_date += delta
 
-            coinprices.index = pd.to_datetime(coinprices.index)
-            coinprices = coinprices.ffill()
-            return coinprices, None
-        except Exception as e:
-            return None, f"Error fetching data for {pair} from {start_date} to {date.today()}: {str(e)}"
+        if coinprices.empty:
+            return None, f"No data available for {pair} from {date(2020, 1, 1)} to {date.today()}"
+
+        coinprices.index = pd.to_datetime(coinprices.index)
+        coinprices = coinprices.ffill()
+        
+        return coinprices, None
     
     except Exception as e:
         return None, str(e)
