@@ -35,7 +35,10 @@ def get_data(cryptos, currency):
         while start_date < end_date:
             try:
                 tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), (start_date + delta).strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
-                if not tmp.empty and 'close' in tmp.columns:
+                if tmp.empty:
+                    start_date += delta
+                    continue
+                if 'close' in tmp.columns:
                     coinprices.append(tmp[['close']])
             except Exception as e:
                 st.error(f"Error fetching data for {pair} on {start_date}: {str(e)}")
