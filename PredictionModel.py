@@ -39,8 +39,9 @@ def get_data(cryptos, currency):
                     start_date += delta
                     continue
                 if 'close' not in tmp.columns:
-                    return None, f"Expected 'close' column not found in data for {pair}."
-                coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)  # Concatenate along rows (axis=0)
+                    start_date += delta
+                    continue
+                coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)
             except Exception as e:
                 return None, f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
 
