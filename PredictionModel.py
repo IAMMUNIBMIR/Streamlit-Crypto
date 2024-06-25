@@ -27,30 +27,31 @@ def get_data(cryptos, currency):
         if pair not in all_cryptos_df['id'].values:
             return None, f"{pair} not found in available cryptocurrency pairs."
 
-        coinprices = pd.DataFrame()
+        coinprices = []
         start_date = date(2020, 1, 1)
         end_date = date.today()
         delta = timedelta(days=100)
 
         while start_date < end_date:
             try:
-                tmp = HistoricalData(pair, 60*60*24, '2020-01-01-00-00', date.today().strftime('%Y-%m-%d-%H-%M'), verbose=False).retrieve_data()
+                tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), (start_date + delta).strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
                 if tmp.empty or 'close' not in tmp.columns:
                     start_date += delta
                     continue
-                coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)
+                coinprices.append(tmp[['close']])
             except Exception as e:
                 return None, f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
             start_date += delta
 
-        if coinprices.empty:
+        if not coinprices:
             return None, f"No data available for {pair} from {date(2020, 1, 1)} to {date.today()}"
 
+        coinprices = pd.concat(coinprices)
         coinprices.index = pd.to_datetime(coinprices.index)
         coinprices = coinprices.ffill()
-        
+
         return coinprices, None
-    
+
     except Exception as e:
         return None, str(e)
 
