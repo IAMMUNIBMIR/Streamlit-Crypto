@@ -38,11 +38,11 @@ def get_data(cryptos, currency):
                 if tmp.empty:
                     start_date += delta
                     continue
+                if 'close' not in tmp.columns:
+                    return None, f"Expected 'close' column not found in data for {pair}."
                 coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)  # Concatenate along rows (axis=0)
             except Exception as e:
-                st.error(f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}")
-                start_date += delta
-                continue
+                return None, f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
 
             start_date += delta
 
@@ -194,3 +194,5 @@ if crypto_options:
                         st.error(f"Error during model training or prediction: {e}")
         else:
             st.error(error)
+else:
+    st.error("No cryptocurrency options available.")
