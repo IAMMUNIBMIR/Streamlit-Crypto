@@ -109,90 +109,85 @@ if crypto_options:
     if cryptos and currency and st.button('Show Predictions'):
         st.header(f'{cryptos}-{currency}')
 
-        coinprices = get_data(cryptos, currency)
-        if not coinprices.empty:
+        coinprices, error = get_data(cryptos, currency)
+        if coinprices is not None:
 
-            # Use the column name directly for selected cryptocurrency
-            selected_column = f'{cryptos}-{currency}'
+            if mode == 'Historical Data':
+                # Plot historical data using Plotly Express
+                fig = px.line(
+                    x=coinprices.index, y=coinprices['close'],
+                    labels={"x": "Date", "y": "Price"},
+                    title=f'{cryptos}-{currency} Historical Prices'
+                )
+                # Update layout for dark theme
+                fig.update_layout(
+                    template='plotly_dark',
+                    xaxis=dict(
+                        gridcolor='rgb(75, 75, 75)',
+                        tickfont=dict(color='white'),
+                        title=dict(text='Date', font=dict(color='white'))
+                    ),
+                    yaxis=dict(
+                        gridcolor='rgb(75, 75, 75)',
+                        tickfont=dict(color='white'),
+                        title=dict(text='Price', font=dict(color='white'))
+                    ),
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='white')
+                )
+                st.plotly_chart(fig)
 
-            if selected_column in coinprices.columns:
+            elif mode == 'Future Predictions':
+                # Prepare data
+                data = coinprices['close'].values.reshape(-1, 1)
+                X, y, scaler = prepare_data(data)
 
-                if mode == 'Historical Data':
-                    # Plot historical data using Plotly Express
-                    fig = px.line(
-                        x=coinprices.index, y=coinprices[selected_column],
-                        labels={"x": "Date", "y": "Price"},
-                        title=f'{cryptos}-{currency} Historical Prices'
-                    )
-                    # Update layout for dark theme
-                    fig.update_layout(
-                        template='plotly_dark',
-                        xaxis=dict(
-                            gridcolor='rgb(75, 75, 75)',
-                            tickfont=dict(color='white'),
-                            title=dict(text='Date', font=dict(color='white'))
-                        ),
-                        yaxis=dict(
-                            gridcolor='rgb(75, 75, 75)',
-                            tickfont=dict(color='white'),
-                            title=dict(text='Price', font=dict(color='white'))
-                        ),
-                        plot_bgcolor='rgba(0,0,0,0)',
-                        paper_bgcolor='rgba(0,0,0,0)',
-                        font=dict(color='white')
-                    )
-                    st.plotly_chart(fig)
+                if X is not None and y is not None and scaler is not None:
+                    # Create and train model
+                    model = XGBRegressor(objective='reg:squarederror', n_estimators=100)
 
-                elif mode == 'Future Predictions':
-                    # Prepare data
-                    data = coinprices[selected_column].values.reshape(-1, 1)
-                    X, y, scaler = prepare_data(data)
+                    try:
+                        with st.spinner('Training the model, please wait...'):
+                            model.fit(X, y)
 
-                    if X is not None and y is not None and scaler is not None:
-                        # Create and train model
-                        model = XGBRegressor(objective='reg:squarederror', n_estimators=100)
+                        # Make future predictions
+                        future_predictions = predict_future(model, data[-60:], scaler)
 
-                        try:
-                            with st.spinner('Training the model, please wait...'):
-                                model.fit(X, y)
+                        if future_predictions is not None:
+                            # Concatenate dates and prices for plot
+                            future_dates = pd.date_range(start=coinprices.index[-1], periods=len(future_predictions)+1, freq='D')[1:]
+                            historical_prices = coinprices['close'].values.flatten()
+                            combined_prices = np.concatenate((historical_prices, future_predictions))
 
-                            # Make future predictions
-                            future_predictions = predict_future(model, data[-60:], scaler)
+                            combined_dates = pd.Index(list(coinprices.index) + list(future_dates))
 
-                            if future_predictions is not None:
-                                # Concatenate dates and prices for plot
-                                future_dates = pd.date_range(start=coinprices.index[-1], periods=len(future_predictions)+1, freq='D')[1:]
-                                historical_prices = coinprices[selected_column].values.flatten()
-                                combined_prices = np.concatenate((historical_prices, future_predictions))
-
-                                combined_dates = pd.Index(list(coinprices.index) + list(future_dates))
-
-                                # Plot using Plotly Express
-                                fig = px.line(
-                                    x=combined_dates,
-                                    y=combined_prices,
-                                    labels={"x": "Date", "y": "Price"},
-                                    title=f'{cryptos}-{currency} Price Prediction'
-                                )
-                                # Update layout for dark theme
-                                fig.update_layout(
-                                    template='plotly_dark',
-                                    xaxis=dict(
-                                        gridcolor='rgb(75, 75, 75)',
-                                        tickfont=dict(color='white'),
-                                        title=dict(text='Date', font=dict(color='white'))
-                                    ),
-                                    yaxis=dict(
-                                        gridcolor='rgb(75, 75, 75)',
-                                        tickfont=dict(color='white'),
-                                        title=dict(text='Price', font=dict(color='white'))
-                                    ),
-                                    plot_bgcolor='rgba(0,0,0,0)',
-                                    paper_bgcolor='rgba(0,0,0,0)',
-                                    font=dict(color='white')
-                                )
-                                st.plotly_chart(fig)
-                        except Exception as e:
-                            st.error(f"Error during model training or prediction: {e}")
-            else:
-                st.error(f"No data found for {cryptos}-{currency}")
+                            # Plot using Plotly Express
+                            fig = px.line(
+                                x=combined_dates,
+                                y=combined_prices,
+                                labels={"x": "Date", "y": "Price"},
+                                title=f'{cryptos}-{currency} Price Prediction'
+                            )
+                            # Update layout for dark theme
+                            fig.update_layout(
+                                template='plotly_dark',
+                                xaxis=dict(
+                                    gridcolor='rgb(75, 75, 75)',
+                                    tickfont=dict(color='white'),
+                                    title=dict(text='Date', font=dict(color='white'))
+                                ),
+                                yaxis=dict(
+                                    gridcolor='rgb(75, 75, 75)',
+                                    tickfont=dict(color='white'),
+                                    title=dict(text='Price', font=dict(color='white'))
+                                ),
+                                plot_bgcolor='rgba(0,0,0,0)',
+                                paper_bgcolor='rgba(0,0,0,0)',
+                                font=dict(color='white')
+                            )
+                            st.plotly_chart(fig)
+                    except Exception as e:
+                        st.error(f"Error during model training or prediction: {e}")
+        else:
+            st.error(error)
