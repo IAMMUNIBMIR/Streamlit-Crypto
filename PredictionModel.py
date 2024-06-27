@@ -30,7 +30,7 @@ def get_data(cryptos, currency):
         coinprices = []
         start_date = date(2020, 1, 1)
         end_date = date.today()
-        delta = timedelta(days=1)
+        delta = timedelta(days=180)
         skipped_dates = []
 
         while start_date < end_date:
@@ -43,9 +43,10 @@ def get_data(cryptos, currency):
                 if 'close' in tmp.columns:
                     coinprices.append(tmp[['close']])
                 else:
-                    st.warning(f"No 'close' data for {pair} on {start_date}")
+                    st.warning(f"No 'close' data for {pair} from {start_date} to {start_date + delta}")
             except Exception as e:
-                st.error(f"Error fetching data for {pair} on {start_date}: {str(e)}")
+                st.error(f"Error fetching data for {pair} from {start_date} to {start_date + delta}: {str(e)}")
+                print(tmp)
             start_date += delta
 
         if not coinprices:
