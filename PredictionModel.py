@@ -35,15 +35,22 @@ def get_data(cryptos, currency):
         while start_date < end_date:
             try:
                 tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), (start_date + delta).strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
-                if tmp.empty:
+                
+                if tmp is None or tmp.empty or 'close' not in tmp.columns:
                     start_date += delta
                     continue
-                if 'close' not in tmp.columns:
-                    start_date += delta
-                    continue
-                coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)
+
+                coinprices = pd.concat([coinprices, tmp[['close']]])
+
+            except (ConnectionError, TimeoutError, ValueError) as e:
+                # Log the specific error (for debugging)
+                st.error(f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}")
+                # Continue to the next iteration of the loop
+                start_date += delta
+                continue
+
             except Exception as e:
-                return None, f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
+                return None, f"Unhandled error fetching data: {str(e)}"
 
             start_date += delta
 
@@ -57,6 +64,7 @@ def get_data(cryptos, currency):
     
     except Exception as e:
         return None, str(e)
+
 
 # Function to prepare data for XGBoost
 def prepare_data(data, time_step=60):
