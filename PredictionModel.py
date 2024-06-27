@@ -39,9 +39,9 @@ def get_data(cryptos, currency):
                 
                 except:
                     return None
-                
+                st.write(tmp)
                 # Check if fetched data is empty or does not contain 'close' column
-                if tmp.empty == True or 'close' not in tmp.columns:
+                if tmp.empty == True or 'close' not in tmp.columns or tmp == None:
                     start_date += delta
                     continue
 
