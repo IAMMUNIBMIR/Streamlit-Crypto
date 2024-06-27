@@ -20,6 +20,8 @@ def get_available_currencies():
         st.error(f"Error fetching cryptocurrencies: {e}")
         return []
 
+import streamlit as st
+
 def get_data(cryptos, currency):
     pair = f'{cryptos}-{currency}'
     try:
@@ -41,8 +43,8 @@ def get_data(cryptos, currency):
                 if 'close' not in tmp.columns:
                     return None, f"Data structure for {pair} does not contain 'close' column."
                 
-                # Debug print to inspect the fetched data
-                print(f"Debug: Data for {pair} fetched successfully:\n{tmp.head()}\n")
+                # Display data using st.write() for Streamlit
+                st.write(f"Debug: Data for {pair} fetched successfully:\n{tmp.head()}\n")
                 
                 coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)
             except Exception as e:
@@ -60,6 +62,7 @@ def get_data(cryptos, currency):
     
     except Exception as e:
         return None, str(e)
+
 
 # Function to prepare data for XGBoost
 def prepare_data(data, time_step=60):
