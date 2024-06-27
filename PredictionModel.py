@@ -35,19 +35,29 @@ def get_data(cryptos, currency):
 
         while start_date < end_date:
             try:
-                tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), (start_date + delta).strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
+                # Retrieve data in 6-month intervals
+                end_interval_date = min(start_date + delta, end_date)
+                tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), end_interval_date.strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
+                
+                # Debug: Print the retrieved DataFrame and its columns
+                print(f"Data for {start_date} to {end_interval_date}:")
+                print(tmp)
+                print(tmp.columns)
+
+                # Check if the data is empty or if columns are missing
                 if tmp.empty or len(tmp.columns) != 6:
                     skipped_dates.append(start_date)
-                    start_date += delta
+                    start_date = end_interval_date
                     continue
+                
                 if 'close' in tmp.columns:
                     coinprices.append(tmp[['close']])
                 else:
-                    st.warning(f"No 'close' data for {pair} from {start_date} to {start_date + delta}")
+                    st.warning(f"No 'close' data for {pair} from {start_date} to {end_interval_date}")
             except Exception as e:
-                st.error(f"Error fetching data for {pair} from {start_date} to {start_date + delta}: {str(e)}")
-                print(tmp)
-            start_date += delta
+                st.error(f"Error fetching data for {pair} from {start_date} to {end_interval_date}: {str(e)}")
+                print(f"Exception Data: {tmp}")
+            start_date = end_interval_date
 
         if not coinprices:
             return None, f"No data available for {pair} from {date(2020, 1, 1)} to {date.today()}"
@@ -63,6 +73,7 @@ def get_data(cryptos, currency):
 
     except Exception as e:
         return None, str(e)
+
 
 # Function to prepare data for XGBoost
 def prepare_data(data, time_step=60):
