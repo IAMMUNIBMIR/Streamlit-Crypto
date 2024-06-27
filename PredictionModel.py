@@ -31,11 +31,13 @@ def get_data(cryptos, currency):
         start_date = date(2020, 1, 1)
         end_date = date.today()
         delta = timedelta(days=1)
+        skipped_dates = []
 
         while start_date < end_date:
             try:
                 tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), (start_date + delta).strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
-                if tmp.empty:
+                if tmp.empty or len(tmp.columns) != 6:
+                    skipped_dates.append(start_date)
                     start_date += delta
                     continue
                 if 'close' in tmp.columns:
@@ -52,6 +54,9 @@ def get_data(cryptos, currency):
         coinprices = pd.concat(coinprices)
         coinprices.index = pd.to_datetime(coinprices.index)
         coinprices = coinprices.ffill()
+
+        if skipped_dates:
+            st.warning(f"Skipped dates due to data issues: {skipped_dates}")
 
         return coinprices, None
 
