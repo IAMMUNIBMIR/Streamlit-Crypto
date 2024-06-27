@@ -30,7 +30,7 @@ def get_data(cryptos, currency):
         coinprices = pd.DataFrame()
         start_date = date(2020, 1, 1)
         end_date = date.today()
-        delta = timedelta(days=365)
+        delta = timedelta(days=100)
 
         while start_date < end_date:
             try:
