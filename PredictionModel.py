@@ -37,11 +37,8 @@ def get_data(cryptos, currency):
                 tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), (start_date + delta).strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
                 
                 # Check if fetched data is empty or does not contain 'close' column
-                if tmp.empty == False or 'close' not in tmp.columns:
+                if tmp.empty == True or 'close' not in tmp.columns:
                     start_date += delta
-                    continue
-                st.write(tmp.empty)
-                if tmp.empty and coinprices.empty:
                     continue
 
                 else:
