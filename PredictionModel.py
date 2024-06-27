@@ -40,6 +40,10 @@ def get_data(cryptos, currency):
                     continue
                 if 'close' not in tmp.columns:
                     return None, f"Data structure for {pair} does not contain 'close' column."
+                
+                # Debug print to inspect the fetched data
+                print(f"Debug: Data for {pair} fetched successfully:\n{tmp.head()}\n")
+                
                 coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)
             except Exception as e:
                 return None, f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
