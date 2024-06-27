@@ -40,6 +40,8 @@ def get_data(cryptos, currency):
                     continue
                 if 'close' in tmp.columns:
                     coinprices.append(tmp[['close']])
+                else:
+                    st.warning(f"No 'close' data for {pair} on {start_date}")
             except Exception as e:
                 st.error(f"Error fetching data for {pair} on {start_date}: {str(e)}")
             start_date += delta
