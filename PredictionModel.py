@@ -47,7 +47,7 @@ def get_data(cryptos, currency):
 
                 else:
                     coinprices = pd.concat([coinprices, tmp[['close']]])
-
+                    st.write(coinprices)
             except Exception as e:
                 return None, f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
 
