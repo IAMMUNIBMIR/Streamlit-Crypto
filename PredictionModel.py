@@ -40,13 +40,13 @@ def get_data(cryptos, currency):
                 if tmp.empty or 'close' not in tmp.columns:
                     start_date += delta
                     continue
-                
+                st.write(tmp.empty)
                 if tmp.empty and coinprices.empty:
                     continue
 
                 else:
                     coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)
-                    
+
             except Exception as e:
                 return None, f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
 
