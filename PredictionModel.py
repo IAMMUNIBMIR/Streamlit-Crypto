@@ -36,7 +36,7 @@ def get_data(cryptos, currency):
         while start_date < end_date:
             try:
                 tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), (start_date + delta).strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
-                if tmp.empty or len(tmp.columns) != 6:
+                if tmp.empty or len(tmp.columns) < 6:  # Adjust this condition if necessary
                     skipped_dates.append(start_date)
                     start_date += delta
                     continue
