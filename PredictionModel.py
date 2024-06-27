@@ -36,15 +36,15 @@ def get_data(cryptos, currency):
             try:
                 tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), (start_date + delta).strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
                 
-                # Debug print to understand fetched data
-                st.write(f"Debug: Fetched DataFrame for {pair}:\n{tmp}\n")
-                st.write(coinprices)
                 # Check if fetched data is empty or does not contain 'close' column
                 if tmp.empty or 'close' not in tmp.columns:
                     start_date += delta
                     continue
-
-                coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)
+                
+                if tmp.empty:
+                    continue
+                else:
+                    coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)
             except Exception as e:
                 return None, f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
 
