@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from xgboost import XGBRegressor
-from datetime import date
+from datetime import date, timedelta
 
 # Set up Streamlit for user inputs
 st.title('Cryptocurrency Price Prediction')
@@ -27,17 +27,38 @@ def get_data(cryptos, currency):
         if pair not in all_cryptos_df['id'].values:
             return None, f"{pair} not found in available cryptocurrency pairs."
 
-        start_date = '2020-01-01-00-00'
-        end_date = date.today().strftime('%Y-%m-%d-%H-%M')
-        
-        tmp = HistoricalData(pair, 60*60*24, start_date, end_date, verbose=False).retrieve_data()
-        if tmp.empty or 'close' not in tmp.columns:
+        coinprices = []
+        start_date = date(2020, 1, 1)
+        end_date = date.today()
+        delta = timedelta(days=1)
+        skipped_dates = []
+
+        while start_date < end_date:
+            try:
+                tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), (start_date + delta).strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
+                if tmp.empty or len(tmp.columns) != 6:
+                    skipped_dates.append(start_date)
+                    start_date += delta
+                    continue
+                if 'close' in tmp.columns:
+                    coinprices.append(tmp[['close']])
+                else:
+                    st.warning(f"No 'close' data for {pair} on {start_date}")
+            except Exception as e:
+                st.error(f"Error fetching data for {pair} on {start_date}: {str(e)}")
+            start_date += delta
+
+        if not coinprices:
             return None, f"No data available for {pair} from {date(2020, 1, 1)} to {date.today()}"
-        
-        tmp = tmp[['close']].dropna()
-        tmp.index = pd.to_datetime(tmp.index)
-        
-        return tmp, None
+
+        coinprices = pd.concat(coinprices)
+        coinprices.index = pd.to_datetime(coinprices.index)
+        coinprices = coinprices.ffill()
+
+        if skipped_dates:
+            st.warning(f"Skipped dates due to data issues: {skipped_dates}")
+
+        return coinprices, None
 
     except Exception as e:
         return None, str(e)
