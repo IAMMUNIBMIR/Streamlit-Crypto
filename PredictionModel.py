@@ -27,57 +27,36 @@ def get_data(cryptos, currency):
         if pair not in all_cryptos_df['id'].values:
             return None, f"{pair} not found in available cryptocurrency pairs."
 
-        coinprices = []
+        coinprices = pd.DataFrame()
         start_date = date(2020, 1, 1)
         end_date = date.today()
-        delta = timedelta(days=180)
-        skipped_dates = []
+        delta = timedelta(days=100)
 
         while start_date < end_date:
             try:
-                # Retrieve data in 6-month intervals
-                end_interval_date = min(start_date + delta, end_date)
-                tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), end_interval_date.strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
-                
-                # Debug: Print the retrieved DataFrame and its columns
-                st.write(f"Data for {start_date} to {end_interval_date}:")
-                st.write(tmp)
-                st.write(tmp.columns)
-
-                # Check if the data is empty or if columns are missing
-                if tmp.empty or len(tmp.columns) != 6:
-                    skipped_dates.append(start_date)
-                    start_date = end_interval_date
+                tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), (start_date + delta).strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
+                if tmp.empty:
+                    start_date += delta
                     continue
-                
-                if 'close' in tmp.columns:
-                    coinprices.append(tmp[['close']])
-                else:
-                    st.warning(f"No 'close' data for {pair} from {start_date} to {end_interval_date}")
+                if 'close' not in tmp.columns:
+                    start_date += delta
+                    continue
+                coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)
             except Exception as e:
-                st.error(f"Error fetching data for {pair} from {start_date} to {end_interval_date}: {str(e)}")
-                # Print tmp if available
-                if 'tmp' in locals():
-                    st.write(f"Exception Data: {tmp}")
-                else:
-                    st.write("No data retrieved due to exception.")
-            start_date = end_interval_date
+                return None, f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
 
-        if not coinprices:
+            start_date += delta
+
+        if coinprices.empty:
             return None, f"No data available for {pair} from {date(2020, 1, 1)} to {date.today()}"
 
-        coinprices = pd.concat(coinprices)
         coinprices.index = pd.to_datetime(coinprices.index)
         coinprices = coinprices.ffill()
-
-        if skipped_dates:
-            st.warning(f"Skipped dates due to data issues: {skipped_dates}")
-
+        
         return coinprices, None
-
+    
     except Exception as e:
         return None, str(e)
-
 
 # Function to prepare data for XGBoost
 def prepare_data(data, time_step=60):
