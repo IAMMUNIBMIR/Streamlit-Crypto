@@ -39,8 +39,7 @@ def get_data(cryptos, currency):
                     start_date += delta
                     continue
                 if 'close' not in tmp.columns:
-                    start_date += delta
-                    continue
+                    return None, f"Data structure for {pair} does not contain 'close' column."
                 coinprices = pd.concat([coinprices, tmp[['close']]], axis=0)
             except Exception as e:
                 return None, f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}"
