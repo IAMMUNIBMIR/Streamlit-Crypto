@@ -40,9 +40,9 @@ def get_data(cryptos, currency):
                 tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), end_interval_date.strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
                 
                 # Debug: Print the retrieved DataFrame and its columns
-                print(f"Data for {start_date} to {end_interval_date}:")
-                print(tmp)
-                print(tmp.columns)
+                st.write(f"Data for {start_date} to {end_interval_date}:")
+                st.write(tmp)
+                st.write(tmp.columns)
 
                 # Check if the data is empty or if columns are missing
                 if tmp.empty or len(tmp.columns) != 6:
@@ -56,7 +56,11 @@ def get_data(cryptos, currency):
                     st.warning(f"No 'close' data for {pair} from {start_date} to {end_interval_date}")
             except Exception as e:
                 st.error(f"Error fetching data for {pair} from {start_date} to {end_interval_date}: {str(e)}")
-                print(f"Exception Data: {tmp}")
+                # Print tmp if available
+                if 'tmp' in locals():
+                    st.write(f"Exception Data: {tmp}")
+                else:
+                    st.write("No data retrieved due to exception.")
             start_date = end_interval_date
 
         if not coinprices:
