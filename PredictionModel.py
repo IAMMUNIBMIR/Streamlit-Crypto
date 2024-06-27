@@ -38,7 +38,7 @@ def get_data(cryptos, currency):
                 
                 # Debug print to understand fetched data
                 st.write(f"Debug: Fetched DataFrame for {pair}:\n{tmp}\n")
-
+                st.write(coinprices)
                 # Check if fetched data is empty or does not contain 'close' column
                 if tmp.empty or 'close' not in tmp.columns:
                     start_date += delta
