@@ -65,7 +65,6 @@ def get_data(cryptos, currency):
     except Exception as e:
         return None, str(e)
 
-
 # Function to prepare data for XGBoost
 def prepare_data(data, time_step=60):
     try:
@@ -153,9 +152,11 @@ if crypto_options:
             elif mode == 'Future Predictions':
                 # Prepare data
                 data = coinprices['close'].values.reshape(-1, 1)
+                st.write(f"Data Shape: {data.shape}")
                 X, y, scaler = prepare_data(data)
 
                 if X is not None and y is not None and scaler is not None:
+                    st.write(f"Prepared Data Shapes - X: {X.shape}, y: {y.shape}")
                     # Create and train model
                     model = XGBRegressor(objective='reg:squarederror', n_estimators=100)
 
@@ -163,10 +164,13 @@ if crypto_options:
                         with st.spinner('Training the model, please wait...'):
                             model.fit(X, y)
 
+                        st.write("Model training completed.")
+                        
                         # Make future predictions
                         future_predictions = predict_future(model, data[-60:], scaler)
 
                         if future_predictions is not None:
+                            st.write("Future predictions completed.")
                             # Concatenate dates and prices for plot
                             future_dates = pd.date_range(start=coinprices.index[-1], periods=len(future_predictions)+1, freq='D')[1:]
                             historical_prices = coinprices['close'].values.flatten()
@@ -199,6 +203,8 @@ if crypto_options:
                                 font=dict(color='white')
                             )
                             st.plotly_chart(fig)
+                        else:
+                            st.error("Future predictions returned None.")
                     except Exception as e:
                         st.error(f"Error during model training or prediction: {e}")
         else:
