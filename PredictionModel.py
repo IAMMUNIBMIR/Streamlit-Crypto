@@ -38,16 +38,16 @@ def get_data(cryptos, currency):
                 
                 if tmp is None or tmp.empty or 'close' not in tmp.columns:
                     start_date += delta
-                    continue
+                    break
 
                 coinprices = pd.concat([coinprices, tmp[['close']]])
 
-            except (ConnectionError, TimeoutError, ValueError) as e:
-                # Log the specific error (for debugging)
-                st.error(f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}")
-                # Continue to the next iteration of the loop
-                start_date += delta
-                continue
+            # except (ConnectionError, TimeoutError, ValueError) as e:
+            #     # Log the specific error (for debugging)
+            #     st.error(f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}")
+            #     # Continue to the next iteration of the loop
+            #     start_date += delta
+            #     continue
 
             except Exception as e:
                 return None, f"Unhandled error fetching data: {str(e)}"
