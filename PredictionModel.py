@@ -58,7 +58,7 @@ def get_data(cryptos, currency):
         return None, str(e)
 
 # Function to prepare data for LightGBM
-def prepare_data(data, time_step=100):
+def prepare_data(data, time_step=180):
 
     try:
         scaler = MinMaxScaler(feature_range=(0, 1))
@@ -142,7 +142,7 @@ if crypto_options:
 
                 if X is not None and y is not None and scaler is not None:
                     st.write(f"Prepared Data Shapes - X: {X.shape}, y: {y.shape}")
-                    model = LGBMRegressor(n_estimators=100, max_depth=10)
+                    model = LGBMRegressor(n_estimators=180, max_depth=10)
 
                     try:
                         with st.spinner('Training the model, please wait...'):
