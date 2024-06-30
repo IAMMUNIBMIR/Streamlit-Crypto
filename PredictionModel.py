@@ -145,13 +145,11 @@ if crypto_options:
                     try:
                         with st.spinner('Training the model, please wait...'):
                             model.fit(X, y)
-
-                        st.write("Model training completed.")
                         
                         future_predictions = predict_future(model, data[-100:], scaler)
 
                         if future_predictions is not None:
-                            st.write("Future predictions completed.")
+
                             future_dates = pd.date_range(start=coinprices.index[-1], periods=len(future_predictions)+1, freq='D')[1:]
                             historical_prices = coinprices['close'].values.flatten()
                             combined_prices = np.concatenate((historical_prices, future_predictions))
