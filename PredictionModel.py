@@ -66,7 +66,7 @@ def get_data(cryptos, currency):
         return None, str(e)
 
 # Function to prepare data for XGBoost
-def prepare_data(data, time_step=60):
+def prepare_data(data, time_step=30):
     try:
         scaler = MinMaxScaler(feature_range=(0, 1))
         scaled_data = scaler.fit_transform(data)
@@ -82,7 +82,7 @@ def prepare_data(data, time_step=60):
         return None, None, None
 
 # Function to make future predictions
-def predict_future(model, data, scaler, time_step=60, steps=180):
+def predict_future(model, data, scaler, time_step=30, steps=180):
     try:
         data = scaler.transform(data)
         future_inputs = data[-time_step:].reshape(1, time_step)  # Reshape for XGBRegressor input
@@ -158,7 +158,7 @@ if crypto_options:
                 if X is not None and y is not None and scaler is not None:
                     st.write(f"Prepared Data Shapes - X: {X.shape}, y: {y.shape}")
                     # Create and train model
-                    model = XGBRegressor(objective='reg:squarederror', n_estimators=100)
+                    model = XGBRegressor(objective='reg:squarederror', n_estimators=50, use_label_encoder=False)
 
                     try:
                         with st.spinner('Training the model, please wait...'):
@@ -167,7 +167,7 @@ if crypto_options:
                         st.write("Model training completed.")
                         
                         # Make future predictions
-                        future_predictions = predict_future(model, data[-60:], scaler)
+                        future_predictions = predict_future(model, data[-30:], scaler)
 
                         if future_predictions is not None:
                             st.write("Future predictions completed.")
