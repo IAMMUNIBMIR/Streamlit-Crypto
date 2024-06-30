@@ -75,7 +75,7 @@ def prepare_data(data, time_step=100):
         return None, None, None
 
 # Function to make future predictions
-def predict_future(model, data, scaler, time_step=100, steps=180):
+def predict_future(model, data, scaler, time_step=100, steps=120):  # Predicting for 4 months (4 * 30 = 120 days)
     try:
         data = scaler.transform(data)
         future_inputs = data[-time_step:].reshape(1, -1)
@@ -137,11 +137,9 @@ if crypto_options:
 
             elif mode == 'Future Predictions':
                 data = coinprices['close'].values.reshape(-1, 1)
-                st.write(f"Data Shape: {data.shape}")
                 X, y, scaler = prepare_data(data)
 
                 if X is not None and y is not None and scaler is not None:
-                    st.write(f"Prepared Data Shapes - X: {X.shape}, y: {y.shape}")
                     model = LGBMRegressor(n_estimators=100, max_depth=10)
 
                     try:
