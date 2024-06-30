@@ -58,7 +58,7 @@ def get_data(cryptos, currency):
         return None, str(e)
 
 # Function to prepare data for LightGBM
-def prepare_data(data, time_step=100):
+def prepare_data(data, time_step=180):
     try:
         scaler = MinMaxScaler(feature_range=(0, 1))
         scaled_data = scaler.fit_transform(data)
