@@ -115,6 +115,9 @@ if crypto_options:
     cryptos = st.selectbox('Select Coin', crypto_options)
     currency = st.selectbox('Select Currency', ['EUR', 'USD', 'USDT', 'GBP', 'JPY', 'KRW'])
 
+    # Define time step
+    time_step = st.slider('Select Time Step', min_value=10, max_value=100, value=30)
+
     # Main process for each selected cryptocurrency
     if cryptos and currency and st.button('Show Predictions'):
         st.header(f'{cryptos}-{currency}')
@@ -150,7 +153,7 @@ if crypto_options:
             elif mode == 'Future Predictions':
                 # Prepare data
                 data = coinprices[['close', 'volume']].values  # Use close price and volume
-                X, y, scaler = prepare_data(data)
+                X, y, scaler = prepare_data(data, time_step=time_step)
 
                 if X is not None and y is not None and scaler is not None:
                     # Split data into training and test sets
@@ -178,7 +181,7 @@ if crypto_options:
                         st.write(f"Model R^2 Score: {score:.2f}")
                         
                         # Make future predictions
-                        future_predictions = predict_future(best_model, data[-time_step:], scaler)
+                        future_predictions = predict_future(best_model, data[-time_step:], scaler, time_step=time_step)
 
                         if future_predictions is not None:
                             st.write("Future predictions completed.")
