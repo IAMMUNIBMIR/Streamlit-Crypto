@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from xgboost import XGBRegressor
 from datetime import date, timedelta
+from sklearn.model_selection import train_test_split, GridSearchCV
 
 # Set up Streamlit for user inputs
 st.title('Cryptocurrency Price Prediction')
@@ -40,12 +41,10 @@ def get_data(cryptos, currency):
                     start_date += delta
                     continue
 
-                coinprices = pd.concat([coinprices, tmp[['close']]])
+                coinprices = pd.concat([coinprices, tmp[['close', 'volume']]])  # Include volume
 
             except (ConnectionError, TimeoutError, ValueError) as e:
-                # Log the specific error (for debugging)
                 st.error(f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}")
-                # Continue to the next iteration of the loop
                 start_date += delta
                 continue
 
@@ -73,7 +72,7 @@ def prepare_data(data, time_step=30):
 
         X, y = [], []
         for i in range(time_step, len(scaled_data)):
-            X.append(scaled_data[i-time_step:i, 0])
+            X.append(scaled_data[i-time_step:i])
             y.append(scaled_data[i, 0])
         X, y = np.array(X), np.array(y)
         return X, y, scaler
@@ -85,14 +84,14 @@ def prepare_data(data, time_step=30):
 def predict_future(model, data, scaler, time_step=30, steps=180):
     try:
         data = scaler.transform(data)
-        future_inputs = data[-time_step:].reshape(1, time_step)  # Reshape for XGBRegressor input
+        future_inputs = data[-time_step:].reshape(1, time_step, data.shape[1])  # Reshape for XGBRegressor input
         
         predictions = []
         for _ in range(steps):
             pred = model.predict(future_inputs)
             predictions.append(pred[0])
-            future_inputs = np.roll(future_inputs, -1)  # Shift array left
-            future_inputs[0, -1] = pred[0]  # Assign prediction to the last element
+            future_inputs = np.roll(future_inputs, -1, axis=1)  # Shift array left
+            future_inputs[0, -1, 0] = pred[0]  # Assign prediction to the last element
         
         predictions = np.array(predictions).reshape(-1, 1)
         predictions = scaler.inverse_transform(predictions)  # Inverse transform predictions
@@ -130,7 +129,6 @@ if crypto_options:
                     labels={"x": "Date", "y": "Price"},
                     title=f'{cryptos}-{currency} Historical Prices'
                 )
-                # Update layout for dark theme
                 fig.update_layout(
                     template='plotly_dark',
                     xaxis=dict(
@@ -151,23 +149,36 @@ if crypto_options:
 
             elif mode == 'Future Predictions':
                 # Prepare data
-                data = coinprices['close'].values.reshape(-1, 1)
-                st.write(f"Data Shape: {data.shape}")
+                data = coinprices[['close', 'volume']].values  # Use close price and volume
                 X, y, scaler = prepare_data(data)
 
                 if X is not None and y is not None and scaler is not None:
-                    st.write(f"Prepared Data Shapes - X: {X.shape}, y: {y.shape}")
-                    # Create and train model
-                    model = XGBRegressor(objective='reg:squarederror', n_estimators=50, use_label_encoder=False)
+                    # Split data into training and test sets
+                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                    
+                    # Define parameter grid for Grid Search
+                    param_grid = {
+                        'n_estimators': [50, 100, 200],
+                        'max_depth': [3, 6, 9],
+                        'learning_rate': [0.01, 0.1, 0.3]
+                    }
+
+                    model = XGBRegressor(objective='reg:squarederror', use_label_encoder=False)
+                    grid_search = GridSearchCV(model, param_grid, cv=3, scoring='neg_mean_squared_error', verbose=1)
 
                     try:
                         with st.spinner('Training the model, please wait...'):
-                            model.fit(X, y)
+                            grid_search.fit(X_train, y_train)
 
                         st.write("Model training completed.")
+                        best_model = grid_search.best_estimator_
+                        
+                        # Evaluate model
+                        score = best_model.score(X_test, y_test)
+                        st.write(f"Model R^2 Score: {score:.2f}")
                         
                         # Make future predictions
-                        future_predictions = predict_future(model, data[-30:], scaler)
+                        future_predictions = predict_future(best_model, data[-time_step:], scaler)
 
                         if future_predictions is not None:
                             st.write("Future predictions completed.")
@@ -185,7 +196,6 @@ if crypto_options:
                                 labels={"x": "Date", "y": "Price"},
                                 title=f'{cryptos}-{currency} Price Prediction'
                             )
-                            # Update layout for dark theme
                             fig.update_layout(
                                 template='plotly_dark',
                                 xaxis=dict(
