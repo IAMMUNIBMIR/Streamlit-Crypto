@@ -4,8 +4,9 @@ from Historic_Crypto import HistoricalData, Cryptocurrencies
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
-from xgboost import XGBRegressor
+from lightgbm import LGBMRegressor
 from datetime import date, timedelta
+from concurrent.futures import ThreadPoolExecutor
 
 # Set up Streamlit for user inputs
 st.title('Cryptocurrency Price Prediction')
@@ -20,6 +21,12 @@ def get_available_currencies():
         st.error(f"Error fetching cryptocurrencies: {e}")
         return []
 
+def fetch_data(pair, start_date, end_date):
+    try:
+        return HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), end_date.strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
+    except Exception:
+        return pd.DataFrame()
+
 def get_data(cryptos, currency):
     pair = f'{cryptos}-{currency}'
     try:
@@ -31,28 +38,13 @@ def get_data(cryptos, currency):
         start_date = date(2020, 1, 1)
         end_date = date.today()
         delta = timedelta(days=100)
-
-        while start_date < end_date:
-            try:
-                tmp = HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), (start_date + delta).strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
-                
-                if tmp is None or tmp.empty or 'close' not in tmp.columns:
-                    start_date += delta
-                    continue
-
-                coinprices = pd.concat([coinprices, tmp[['close']]])
-
-            except (ConnectionError, TimeoutError, ValueError) as e:
-                # Log the specific error (for debugging)
-                st.error(f"Error fetching data for {pair} between {start_date} and {start_date + delta}: {str(e)}")
-                # Continue to the next iteration of the loop
-                start_date += delta
-                continue
-
-            except Exception as e:
-                return None, f"Unhandled error fetching data: {str(e)}"
-
-            start_date += delta
+        
+        with ThreadPoolExecutor() as executor:
+            future_to_date = {executor.submit(fetch_data, pair, start_date + timedelta(days=i*100), min(start_date + timedelta(days=(i+1)*100), end_date)): i for i in range((end_date - start_date).days // 100 + 1)}
+            for future in future_to_date:
+                tmp = future.result()
+                if not tmp.empty and 'close' in tmp.columns:
+                    coinprices = pd.concat([coinprices, tmp[['close']]])
 
         if coinprices.empty:
             return None, f"No data available for {pair} from {date(2020, 1, 1)} to {date.today()}"
@@ -65,7 +57,7 @@ def get_data(cryptos, currency):
     except Exception as e:
         return None, str(e)
 
-# Function to prepare data for XGBoost
+# Function to prepare data for LightGBM
 def prepare_data(data, time_step=100):
     try:
         scaler = MinMaxScaler(feature_range=(0, 1))
@@ -85,7 +77,7 @@ def prepare_data(data, time_step=100):
 def predict_future(model, data, scaler, time_step=100, steps=180):
     try:
         data = scaler.transform(data)
-        future_inputs = data[-time_step:].reshape(1, time_step)  # Reshape for XGBRegressor input
+        future_inputs = data[-time_step:].reshape(1, -1)
         
         predictions = []
         for _ in range(steps):
@@ -95,9 +87,9 @@ def predict_future(model, data, scaler, time_step=100, steps=180):
             future_inputs[0, -1] = pred[0]  # Assign prediction to the last element
         
         predictions = np.array(predictions).reshape(-1, 1)
-        predictions = scaler.inverse_transform(predictions)  # Inverse transform predictions
+        predictions = scaler.inverse_transform(predictions)
         
-        return predictions.flatten()  # Return flattened predictions array
+        return predictions.flatten()
     except Exception as e:
         st.error(f"Error predicting future prices: {e}")
         return None
@@ -106,31 +98,24 @@ def predict_future(model, data, scaler, time_step=100, steps=180):
 crypto_options = get_available_currencies()
 
 if crypto_options:
-
-    # User selects mode: Historical Data or Future Predictions
     mode = st.selectbox('Select Mode', ['Historical Data', 'Future Predictions'])
 
     st.header("Available Cryptocurrencies")
 
-    # User selects cryptocurrency and currency
     cryptos = st.selectbox('Select Coin', crypto_options)
     currency = st.selectbox('Select Currency', ['EUR', 'USD', 'USDT', 'GBP', 'JPY', 'KRW'])
 
-    # Main process for each selected cryptocurrency
     if cryptos and currency and st.button('Show Predictions'):
         st.header(f'{cryptos}-{currency}')
 
         coinprices, error = get_data(cryptos, currency)
         if coinprices is not None:
-
             if mode == 'Historical Data':
-                # Plot historical data using Plotly Express
                 fig = px.line(
                     x=coinprices.index, y=coinprices['close'],
                     labels={"x": "Date", "y": "Price"},
                     title=f'{cryptos}-{currency} Historical Prices'
                 )
-                # Update layout for dark theme
                 fig.update_layout(
                     template='plotly_dark',
                     xaxis=dict(
@@ -150,15 +135,13 @@ if crypto_options:
                 st.plotly_chart(fig)
 
             elif mode == 'Future Predictions':
-                # Prepare data
                 data = coinprices['close'].values.reshape(-1, 1)
                 st.write(f"Data Shape: {data.shape}")
                 X, y, scaler = prepare_data(data)
 
                 if X is not None and y is not None and scaler is not None:
                     st.write(f"Prepared Data Shapes - X: {X.shape}, y: {y.shape}")
-                    # Create and train model
-                    model = XGBRegressor(objective='reg:squarederror', n_estimators=50, use_label_encoder=False)
+                    model = LGBMRegressor(n_estimators=100, max_depth=10)
 
                     try:
                         with st.spinner('Training the model, please wait...'):
@@ -166,26 +149,22 @@ if crypto_options:
 
                         st.write("Model training completed.")
                         
-                        # Make future predictions
                         future_predictions = predict_future(model, data[-100:], scaler)
 
                         if future_predictions is not None:
                             st.write("Future predictions completed.")
-                            # Concatenate dates and prices for plot
                             future_dates = pd.date_range(start=coinprices.index[-1], periods=len(future_predictions)+1, freq='D')[1:]
                             historical_prices = coinprices['close'].values.flatten()
                             combined_prices = np.concatenate((historical_prices, future_predictions))
 
                             combined_dates = pd.Index(list(coinprices.index) + list(future_dates))
 
-                            # Plot using Plotly Express
                             fig = px.line(
                                 x=combined_dates,
                                 y=combined_prices,
                                 labels={"x": "Date", "y": "Price"},
                                 title=f'{cryptos}-{currency} Price Prediction'
                             )
-                            # Update layout for dark theme
                             fig.update_layout(
                                 template='plotly_dark',
                                 xaxis=dict(
