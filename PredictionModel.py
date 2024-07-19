@@ -187,3 +187,5 @@ if crypto_options:
             st.error(error)
 else:
     st.error("No cryptocurrency options available.")
+
+
