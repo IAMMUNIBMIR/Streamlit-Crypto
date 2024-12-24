@@ -1,33 +1,33 @@
 import streamlit as st
-import requests
+import plotly.express as px
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+import requests
 from sklearn.preprocessing import MinMaxScaler
 from lightgbm import LGBMRegressor
-import plotly.express as px
+from datetime import date, timedelta
 
-# Streamlit Title
+# Streamlit App Title
 st.title("Cryptocurrency Price Prediction")
 
-# Base URL for CoinGecko API
-COINGECKO_API = "https://api.coingecko.com/api/v3"
+# CoinGecko API Base URL
+COINGECKO_API_URL = "https://api.coingecko.com/api/v3"
 
 # Function to fetch available cryptocurrencies
-def get_available_cryptos():
+def get_available_currencies():
     try:
-        response = requests.get(f"{COINGECKO_API}/coins/list")
+        response = requests.get(f"{COINGECKO_API_URL}/coins/list")
         response.raise_for_status()
         coins = response.json()
-        return {coin['id']: coin['name'] for coin in coins}
+        return sorted([coin['id'] for coin in coins])
     except Exception as e:
-        st.error(f"Error fetching cryptocurrency list: {e}")
-        return {}
+        st.error(f"Error fetching cryptocurrencies: {e}")
+        return []
 
 # Function to fetch historical data
 def get_historical_data(crypto_id, vs_currency, days):
     try:
-        url = f"{COINGECKO_API}/coins/{crypto_id}/market_chart"
+        url = f"{COINGECKO_API_URL}/coins/{crypto_id}/market_chart"
         params = {"vs_currency": vs_currency, "days": days}
         response = requests.get(url, params=params)
         response.raise_for_status()
@@ -56,46 +56,46 @@ def prepare_data(data, time_step=100):
         st.error(f"Error preparing data: {e}")
         return None, None, None
 
-# Function to predict future prices
-def predict_future(model, data, scaler, time_step=100, steps=30):
+# Function to make future predictions
+def predict_future(model, data, scaler, time_step=100, steps=120):  # Predicting 4 months (120 days)
     try:
         data = scaler.transform(data)
         future_inputs = data[-time_step:].reshape(1, -1)
-        
+
         predictions = []
         for _ in range(steps):
             pred = model.predict(future_inputs)
             predictions.append(pred[0])
             future_inputs = np.roll(future_inputs, -1)  # Shift array left
             future_inputs[0, -1] = pred[0]  # Assign prediction to the last element
-        
+
         predictions = np.array(predictions).reshape(-1, 1)
         predictions = scaler.inverse_transform(predictions)
+
         return predictions.flatten()
     except Exception as e:
         st.error(f"Error predicting future prices: {e}")
         return None
 
-# Fetch available cryptocurrencies
-cryptos = get_available_cryptos()
+# Main Application Logic
+crypto_options = get_available_currencies()
 
-if cryptos:
+if crypto_options:
     mode = st.selectbox("Select Mode", ["Historical Data", "Future Predictions"])
-    crypto_id = st.selectbox("Select Cryptocurrency", list(cryptos.keys()), format_func=lambda x: cryptos[x])
-    vs_currency = st.selectbox("Select Currency", ["usd", "eur", "gbp", "jpy", "inr"])
-    days = st.slider("Select number of days for historical data", 30, 365, 180)
+    cryptos = st.selectbox("Select Cryptocurrency", crypto_options)
+    currency = st.selectbox("Select Currency", ["usd", "eur", "gbp", "jpy", "inr"])
+    days = st.slider("Select Historical Data Range (days)", min_value=30, max_value=365, value=180)
 
-    if st.button("Show Predictions"):
-        st.header(f"{cryptos[crypto_id]} ({vs_currency.upper()})")
+    if cryptos and currency and st.button("Show Predictions"):
+        st.header(f"{cryptos.upper()}-{currency.upper()}")
 
-        prices = get_historical_data(crypto_id, vs_currency, days)
+        prices = get_historical_data(cryptos, currency, days)
         if not prices.empty:
             if mode == "Historical Data":
                 fig = px.line(
-                    prices, 
-                    x=prices.index, y='price', 
-                    labels={"index": "Date", "price": "Price"},
-                    title=f"{cryptos[crypto_id]} Historical Prices"
+                    x=prices.index, y=prices['price'],
+                    labels={"x": "Date", "y": "Price"},
+                    title=f"{cryptos.upper()}-{currency.upper()} Historical Prices"
                 )
                 fig.update_layout(template="plotly_dark")
                 st.plotly_chart(fig)
@@ -111,11 +111,10 @@ if cryptos:
                         with st.spinner("Training the model, please wait..."):
                             model.fit(X, y)
 
-                        future_predictions = predict_future(model, data[-100:], scaler, steps=60)
+                        future_predictions = predict_future(model, data[-100:], scaler)
 
                         if future_predictions is not None:
-                            future_dates = pd.date_range(
-                                start=prices.index[-1], periods=len(future_predictions)+1, freq="D")[1:]
+                            future_dates = pd.date_range(start=prices.index[-1], periods=len(future_predictions) + 1, freq="D")[1:]
                             historical_prices = prices['price'].values.flatten()
                             combined_prices = np.concatenate((historical_prices, future_predictions))
 
@@ -125,7 +124,7 @@ if cryptos:
                                 x=combined_dates,
                                 y=combined_prices,
                                 labels={"x": "Date", "y": "Price"},
-                                title=f"{cryptos[crypto_id]} Price Prediction (Next 60 Days)"
+                                title=f"{cryptos.upper()}-{currency.upper()} Price Prediction"
                             )
                             fig.update_layout(template="plotly_dark")
                             st.plotly_chart(fig)
@@ -133,8 +132,5 @@ if cryptos:
                             st.error("Future predictions returned None.")
                     except Exception as e:
                         st.error(f"Error during model training or prediction: {e}")
-        else:
-            st.error("No historical data available.")
 else:
-    st.error("No cryptocurrency options available.")
-    st.write("Please ensure you have a stable internet connection and the data source is accessible.")
+    st.error("No cryptocurrencies available.")
