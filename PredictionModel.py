@@ -7,9 +7,6 @@ from sklearn.preprocessing import MinMaxScaler
 from lightgbm import LGBMRegressor
 from datetime import date, timedelta
 from concurrent.futures import ThreadPoolExecutor
-from flask import Flask
-
-app = Flask(__name__)
 
 # Set up Streamlit for user inputs
 st.title('Cryptocurrency Price Prediction')
@@ -190,7 +187,3 @@ if crypto_options:
             st.error(error)
 else:
     st.error("No cryptocurrency options available.")
-
-@app.route('/ping', methods=['GET'])
-def ping():
-    return 'Ping received', 200
