@@ -79,9 +79,6 @@ def predict_future(model, data, scaler, time_step=100, steps=30):
 # Fetch available cryptocurrencies
 cryptos = get_available_cryptos()
 
-# Debugging: Display fetched options
-st.write("Available cryptocurrencies fetched:", cryptos)
-
 if cryptos:
     mode = st.selectbox("Select Mode", ["Historical Data", "Future Predictions"])
     crypto_id = st.selectbox("Select Cryptocurrency", list(cryptos.keys()), format_func=lambda x: cryptos[x])
