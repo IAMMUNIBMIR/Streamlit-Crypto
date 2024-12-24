@@ -9,26 +9,33 @@ from datetime import date, timedelta
 from concurrent.futures import ThreadPoolExecutor
 
 # Set up Streamlit for user inputs
-st.title('Cryptocurrency Price Prediction')
+st.title("Cryptocurrency Price Prediction")
 
 # Function to get all available cryptocurrencies and their pairs
 def get_available_currencies():
     try:
+        st.write("Fetching cryptocurrency pairs...")  # Debugging
         all_cryptos_df = Cryptocurrencies().find_crypto_pairs()
+        st.write("Crypto pairs dataframe:", all_cryptos_df)  # Debugging
         crypto_options = sorted(set([pair.split('-')[0] for pair in all_cryptos_df['id']]))
         return crypto_options
     except Exception as e:
         st.error(f"Error fetching cryptocurrencies: {e}")
         return []
 
+# Function to fetch data in chunks
 def fetch_data(pair, start_date, end_date):
     try:
-        return HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), end_date.strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
+        return HistoricalData(
+            pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'),
+            end_date.strftime('%Y-%m-%d-00-00'), verbose=False
+        ).retrieve_data()
     except Exception:
         return pd.DataFrame()
 
+# Function to retrieve cryptocurrency price data
 def get_data(cryptos, currency):
-    pair = f'{cryptos}-{currency}'
+    pair = f"{cryptos}-{currency}"
     try:
         all_cryptos_df = Cryptocurrencies().find_crypto_pairs()
         if pair not in all_cryptos_df['id'].values:
@@ -40,20 +47,23 @@ def get_data(cryptos, currency):
         delta = timedelta(days=100)
         
         with ThreadPoolExecutor() as executor:
-            future_to_date = {executor.submit(fetch_data, pair, start_date + timedelta(days=i*100), min(start_date + timedelta(days=(i+1)*100), end_date)): i for i in range((end_date - start_date).days // 100 + 1)}
+            future_to_date = {
+                executor.submit(
+                    fetch_data, pair, start_date + timedelta(days=i*100), 
+                    min(start_date + timedelta(days=(i+1)*100), end_date)
+                ): i for i in range((end_date - start_date).days // 100 + 1)
+            }
             for future in future_to_date:
                 tmp = future.result()
-                if not tmp.empty and 'close' in tmp.columns:
-                    coinprices = pd.concat([coinprices, tmp[['close']]])
+                if not tmp.empty and "close" in tmp.columns:
+                    coinprices = pd.concat([coinprices, tmp[["close"]]])
 
         if coinprices.empty:
             return None, f"No data available for {pair} from {date(2020, 1, 1)} to {date.today()}"
 
         coinprices.index = pd.to_datetime(coinprices.index)
         coinprices = coinprices.ffill()
-        
         return coinprices, None
-    
     except Exception as e:
         return None, str(e)
 
@@ -74,7 +84,7 @@ def prepare_data(data, time_step=100):
         return None, None, None
 
 # Function to make future predictions
-def predict_future(model, data, scaler, time_step=100, steps=120):  # Predicting for 4 months (4 * 30 = 120 days)
+def predict_future(model, data, scaler, time_step=100, steps=120):
     try:
         data = scaler.transform(data)
         future_inputs = data[-time_step:].reshape(1, -1)
@@ -88,7 +98,6 @@ def predict_future(model, data, scaler, time_step=100, steps=120):  # Predicting
         
         predictions = np.array(predictions).reshape(-1, 1)
         predictions = scaler.inverse_transform(predictions)
-        
         return predictions.flatten()
     except Exception as e:
         st.error(f"Error predicting future prices: {e}")
@@ -98,7 +107,7 @@ def predict_future(model, data, scaler, time_step=100, steps=120):  # Predicting
 crypto_options = get_available_currencies()
 
 # Debugging: Display fetched options
-st.write("Available Cryptocurrencies:", crypto_options)
+st.write("Crypto options fetched:", crypto_options)
 
 if crypto_options:
     mode = st.selectbox("Select Mode", ["Historical Data", "Future Predictions"])
