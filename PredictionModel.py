@@ -16,6 +16,7 @@ def get_available_currencies():
     try:
         all_cryptos_df = Cryptocurrencies().find_crypto_pairs()
         crypto_options = sorted(set([pair.split('-')[0] for pair in all_cryptos_df['id']]))
+        print(f"Available cryptos: {crypto_options}")
         return crypto_options
     except Exception as e:
         st.error(f"Error fetching cryptocurrencies: {e}")
@@ -23,6 +24,7 @@ def get_available_currencies():
 
 def fetch_data(pair, start_date, end_date):
     try:
+        print(f"Fetching data for {pair} from {start_date} to {end_date}")
         return HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), end_date.strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
     except Exception:
         return pd.DataFrame()
@@ -52,6 +54,7 @@ def get_data(cryptos, currency):
         coinprices.index = pd.to_datetime(coinprices.index)
         coinprices = coinprices.ffill()
         
+        print(f"Fetched coinprices:\n{coinprices.head()}")
         return coinprices, None
     
     except Exception as e:
@@ -59,7 +62,6 @@ def get_data(cryptos, currency):
 
 # Function to prepare data for LightGBM
 def prepare_data(data, time_step=100):
-
     try:
         scaler = MinMaxScaler(feature_range=(0, 1))
         scaled_data = scaler.fit_transform(data)
@@ -69,13 +71,14 @@ def prepare_data(data, time_step=100):
             X.append(scaled_data[i-time_step:i, 0])
             y.append(scaled_data[i, 0])
         X, y = np.array(X), np.array(y)
+        print(f"Prepared data: X.shape={X.shape}, y.shape={y.shape}")
         return X, y, scaler
     except Exception as e:
         st.error(f"Error preparing data: {e}")
         return None, None, None
 
 # Function to make future predictions
-def predict_future(model, data, scaler, time_step=100, steps=120):  # Predicting for 4 months (4 * 30 = 120 days)
+def predict_future(model, data, scaler, time_step=100, steps=120):
     try:
         data = scaler.transform(data)
         future_inputs = data[-time_step:].reshape(1, -1)
