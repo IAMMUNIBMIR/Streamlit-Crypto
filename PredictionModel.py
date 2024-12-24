@@ -111,7 +111,7 @@ if cryptos:
                         with st.spinner("Training the model, please wait..."):
                             model.fit(X, y)
 
-                        future_predictions = predict_future(model, data[-100:], scaler)
+                        future_predictions = predict_future(model, data[-100:], scaler, steps=60)
 
                         if future_predictions is not None:
                             future_dates = pd.date_range(
@@ -125,7 +125,7 @@ if cryptos:
                                 x=combined_dates,
                                 y=combined_prices,
                                 labels={"x": "Date", "y": "Price"},
-                                title=f"{cryptos[crypto_id]} Price Prediction"
+                                title=f"{cryptos[crypto_id]} Price Prediction (Next 60 Days)"
                             )
                             fig.update_layout(template="plotly_dark")
                             st.plotly_chart(fig)
