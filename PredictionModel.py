@@ -49,16 +49,9 @@ def fetch_data(crypto_symbol, start_date, end_date, symbol_to_id):
             st.error(f"Invalid cryptocurrency symbol: {crypto_symbol}")
             return pd.DataFrame()
 
-        # Ensure that start_date and end_date are datetime objects (convert date to datetime)
-        start_date = datetime.combine(start_date, datetime.min.time())
-        end_date = datetime.combine(end_date, datetime.min.time())
-
-        # Convert the start and end dates to Unix timestamps
-        start_timestamp = int(start_date.timestamp())
-        end_timestamp = int(end_date.timestamp())
-
         # Fetch historical data from CoinGecko
-        data = cg.get_coin_market_chart_range_by_id(id=crypto_id, vs_currency='usd', from_timestamp=start_timestamp, to_timestamp=end_timestamp)
+        data = cg.get_coin_market_chart_range_by_id(id=crypto_id, vs_currency='usd', 
+                                                    from_timestamp=start_date, to_timestamp=end_date)
         
         # Convert the data into a pandas DataFrame
         coin_prices = pd.DataFrame(data['prices'], columns=['timestamp', 'price'])
@@ -119,12 +112,16 @@ if crypto_options:
     end_date = date.today()
     start_date = end_date - timedelta(days=180)  # 6 months ago
 
+    # Convert start_date and end_date into Unix timestamps manually
+    start_date = datetime.combine(start_date, datetime.min.time())
+    end_date = datetime.combine(end_date, datetime.min.time())
+
+    # Fetch the data based on user selection
     if cryptos and currency and st.button('Show Predictions'):
         st.header(f'{cryptos}-{currency}')
         st.write(f"Fetching data for {cryptos}-{currency} from {start_date} to {end_date}...")
 
-        # Fetch the data based on user selection
-        coinprices = fetch_data(cryptos, start_date, end_date, symbol_to_id)
+        coinprices = fetch_data(cryptos, int(start_date.timestamp()), int(end_date.timestamp()), symbol_to_id)
         
         if not coinprices.empty:
             if mode == 'Historical Data':
