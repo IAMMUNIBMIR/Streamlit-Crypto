@@ -14,14 +14,17 @@ st.title('Cryptocurrency Price Prediction')
 # Initialize the CoinGecko API client
 cg = CoinGeckoAPI()
 
-# Function to get all available cryptocurrencies from CoinGecko
+# Function to get all available cryptocurrencies from CoinGecko and clean the list
 def get_available_currencies():
     try:
         # Fetch the list of coins from CoinGecko
         coins = cg.get_coins_list()
         
-        # Extract only the coin symbols (e.g., 'bitcoin', 'ethereum')
-        crypto_options = [coin['symbol'].upper() for coin in coins]
+        # Extract only the main coin symbols (e.g., 'bitcoin', 'ethereum', etc.)
+        # Avoid duplicate coin entries by mapping some variations to the main coin
+        crypto_options = set([coin['symbol'] for coin in coins if coin['symbol'] in ['btc', 'eth', 'ltc', 'xrp', 'ada', 'doge', 'sol', 'link', 'dot', 'uni']])
+        
+        # Convert set to a sorted list
         return sorted(crypto_options)
     except Exception as e:
         st.error(f"Error fetching cryptocurrencies: {e}")
