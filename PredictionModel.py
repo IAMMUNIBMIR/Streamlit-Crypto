@@ -16,7 +16,10 @@ def get_available_currencies():
     try:
         # Try fetching all available cryptocurrency pairs from the API
         all_cryptos_df = Cryptocurrencies().find_crypto_pairs()
-        
+
+        # Log the raw response to check what the API is returning
+        st.write("API response (raw):", all_cryptos_df)
+
         # Ensure the dataframe is returned and contains data
         if all_cryptos_df is None or all_cryptos_df.empty:
             st.error("No cryptocurrency pairs found.")
@@ -32,7 +35,6 @@ def get_available_currencies():
 
 def fetch_data(pair, start_date, end_date):
     try:
-        print(f"Fetching data for {pair} from {start_date} to {end_date}")
         return HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), end_date.strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
     except Exception:
         return pd.DataFrame()
@@ -62,7 +64,6 @@ def get_data(cryptos, currency):
         coinprices.index = pd.to_datetime(coinprices.index)
         coinprices = coinprices.ffill()
         
-        print(f"Fetched coinprices:\n{coinprices.head()}")
         return coinprices, None
     
     except Exception as e:
@@ -79,7 +80,6 @@ def prepare_data(data, time_step=100):
             X.append(scaled_data[i-time_step:i, 0])
             y.append(scaled_data[i, 0])
         X, y = np.array(X), np.array(y)
-        print(f"Prepared data: X.shape={X.shape}, y.shape={y.shape}")
         return X, y, scaler
     except Exception as e:
         st.error(f"Error preparing data: {e}")
@@ -110,8 +110,8 @@ def predict_future(model, data, scaler, time_step=100, steps=120):
 crypto_options = get_available_currencies()
 
 if crypto_options:
+    # Display the mode selectbox and other inputs if data was fetched
     mode = st.selectbox('Select Mode', ['Historical Data', 'Future Predictions'])
-
     st.header("Available Cryptocurrencies")
 
     cryptos = st.selectbox('Select Coin', crypto_options)
@@ -119,7 +119,9 @@ if crypto_options:
 
     if cryptos and currency and st.button('Show Predictions'):
         st.header(f'{cryptos}-{currency}')
+        st.write(f"Fetching data for {cryptos}-{currency}...")
 
+        # Fetch the data based on user selection
         coinprices, error = get_data(cryptos, currency)
         if coinprices is not None:
             if mode == 'Historical Data':
@@ -160,7 +162,6 @@ if crypto_options:
                         future_predictions = predict_future(model, data[-100:], scaler)
 
                         if future_predictions is not None:
-
                             future_dates = pd.date_range(start=coinprices.index[-1], periods=len(future_predictions)+1, freq='D')[1:]
                             historical_prices = coinprices['close'].values.flatten()
                             combined_prices = np.concatenate((historical_prices, future_predictions))
