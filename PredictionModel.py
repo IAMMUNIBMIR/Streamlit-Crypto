@@ -111,12 +111,16 @@ if crypto_options:
     cryptos = st.selectbox('Select Coin', crypto_options)
     currency = st.selectbox('Select Currency', ['USD', 'EUR', 'GBP', 'JPY', 'KRW'])
 
+    # Show data for the previous 6 months
+    end_date = date.today()
+    start_date = end_date - timedelta(days=180)  # 6 months ago
+
     if cryptos and currency and st.button('Show Predictions'):
         st.header(f'{cryptos}-{currency}')
-        st.write(f"Fetching data for {cryptos}-{currency}...")
+        st.write(f"Fetching data for {cryptos}-{currency} from {start_date} to {end_date}...")
 
         # Fetch the data based on user selection
-        coinprices = fetch_data(cryptos, date(2020, 1, 1), date.today(), symbol_to_id)
+        coinprices = fetch_data(cryptos, start_date, end_date, symbol_to_id)
         
         if not coinprices.empty:
             if mode == 'Historical Data':
@@ -124,7 +128,7 @@ if crypto_options:
                     fig = px.line(
                         x=coinprices.index, y=coinprices['price'],
                         labels={"x": "Date", "y": "Price (USD)"},
-                        title=f'{cryptos} Historical Prices'
+                        title=f'{cryptos} Historical Prices (Last 6 months)'
                     )
                     fig.update_layout(
                         template='plotly_dark',
