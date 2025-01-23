@@ -49,9 +49,10 @@ def fetch_data(crypto_symbol, start_date, end_date, symbol_to_id):
             st.error(f"Invalid cryptocurrency symbol: {crypto_symbol}")
             return pd.DataFrame()
 
-        # Fetch historical data from CoinGecko
+        # Fetch historical data from CoinGecko using datetime objects directly
         data = cg.get_coin_market_chart_range_by_id(id=crypto_id, vs_currency='usd', 
-                                                    from_timestamp=start_date, to_timestamp=end_date)
+                                                    from_timestamp=int(start_date.timestamp()), 
+                                                    to_timestamp=int(end_date.timestamp()))
         
         # Convert the data into a pandas DataFrame
         coin_prices = pd.DataFrame(data['prices'], columns=['timestamp', 'price'])
@@ -109,19 +110,15 @@ if crypto_options:
     currency = st.selectbox('Select Currency', ['USD', 'EUR', 'GBP', 'JPY', 'KRW'])
 
     # Show data for the previous 6 months
-    end_date = date.today()
+    end_date = datetime.now()
     start_date = end_date - timedelta(days=180)  # 6 months ago
 
-    # Convert start_date and end_date into Unix timestamps manually
-    start_date = datetime.combine(start_date, datetime.min.time())
-    end_date = datetime.combine(end_date, datetime.min.time())
-
-    # Fetch the data based on user selection
     if cryptos and currency and st.button('Show Predictions'):
         st.header(f'{cryptos}-{currency}')
         st.write(f"Fetching data for {cryptos}-{currency} from {start_date} to {end_date}...")
 
-        coinprices = fetch_data(cryptos, int(start_date.timestamp()), int(end_date.timestamp()), symbol_to_id)
+        # Fetch the data based on user selection
+        coinprices = fetch_data(cryptos, start_date, end_date, symbol_to_id)
         
         if not coinprices.empty:
             if mode == 'Historical Data':
