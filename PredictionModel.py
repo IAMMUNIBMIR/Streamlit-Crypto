@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from lightgbm import LGBMRegressor
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 
 # Set up Streamlit for user inputs
 st.title('Cryptocurrency Price Prediction')
@@ -48,6 +48,10 @@ def fetch_data(crypto_symbol, start_date, end_date, symbol_to_id):
         if not crypto_id:
             st.error(f"Invalid cryptocurrency symbol: {crypto_symbol}")
             return pd.DataFrame()
+
+        # Ensure that start_date and end_date are datetime objects
+        start_date = datetime.combine(start_date, datetime.min.time())
+        end_date = datetime.combine(end_date, datetime.min.time())
 
         # Convert the start and end dates to Unix timestamps
         start_timestamp = int(start_date.timestamp())
