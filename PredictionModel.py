@@ -1,6 +1,6 @@
 import streamlit as st
 import plotly.express as px
-from Historic_Crypto import HistoricalData, Cryptocurrencies
+from pycoingecko import CoinGeckoAPI
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
@@ -11,65 +11,39 @@ from concurrent.futures import ThreadPoolExecutor
 # Set up Streamlit for user inputs
 st.title('Cryptocurrency Price Prediction')
 
-# Function to get all available cryptocurrencies and their pairs
+# Initialize the CoinGecko API client
+cg = CoinGeckoAPI()
+
+# Function to get all available cryptocurrencies from CoinGecko
 def get_available_currencies():
     try:
-        # Try fetching all available cryptocurrency pairs from the API
-        all_cryptos_df = Cryptocurrencies().find_crypto_pairs()
-
-        # Log the raw response to check what the API is returning
-        st.write("API response (raw):", all_cryptos_df)
-
-        # Ensure the dataframe is returned and contains data
-        if all_cryptos_df is None or all_cryptos_df.empty:
-            st.error("No cryptocurrency pairs found.")
-            return []
-
-        # Extract the unique cryptocurrencies from the pairings (e.g., BTC-USDT, ETH-USDT)
-        crypto_options = sorted(set([pair.split('-')[0] for pair in all_cryptos_df['id']]))
-        return crypto_options
-    
+        # Fetch the list of coins from CoinGecko
+        coins = cg.get_coins_list()
+        
+        # Extract only the coin symbols (e.g., 'bitcoin', 'ethereum')
+        crypto_options = [coin['symbol'].upper() for coin in coins]
+        return sorted(crypto_options)
     except Exception as e:
         st.error(f"Error fetching cryptocurrencies: {e}")
         return []
 
-def fetch_data(pair, start_date, end_date):
+def fetch_data(crypto, start_date, end_date):
     try:
-        return HistoricalData(pair, 60*60*24, start_date.strftime('%Y-%m-%d-00-00'), end_date.strftime('%Y-%m-%d-00-00'), verbose=False).retrieve_data()
-    except Exception:
+        # Convert the start and end dates to Unix timestamps
+        start_timestamp = int(start_date.timestamp())
+        end_timestamp = int(end_date.timestamp())
+
+        # Fetch historical data from CoinGecko
+        data = cg.get_coin_market_chart_range_by_id(id=crypto, vs_currency='usd', from_timestamp=start_timestamp, to_timestamp=end_timestamp)
+        
+        # Convert the data into a pandas DataFrame
+        coin_prices = pd.DataFrame(data['prices'], columns=['timestamp', 'price'])
+        coin_prices['timestamp'] = pd.to_datetime(coin_prices['timestamp'], unit='ms')
+        coin_prices.set_index('timestamp', inplace=True)
+        return coin_prices
+    except Exception as e:
         return pd.DataFrame()
 
-def get_data(cryptos, currency):
-    pair = f'{cryptos}-{currency}'
-    try:
-        all_cryptos_df = Cryptocurrencies().find_crypto_pairs()
-        if pair not in all_cryptos_df['id'].values:
-            return None, f"{pair} not found in available cryptocurrency pairs."
-
-        coinprices = pd.DataFrame()
-        start_date = date(2020, 1, 1)
-        end_date = date.today()
-        delta = timedelta(days=100)
-        
-        with ThreadPoolExecutor() as executor:
-            future_to_date = {executor.submit(fetch_data, pair, start_date + timedelta(days=i*100), min(start_date + timedelta(days=(i+1)*100), end_date)): i for i in range((end_date - start_date).days // 100 + 1)}
-            for future in future_to_date:
-                tmp = future.result()
-                if not tmp.empty and 'close' in tmp.columns:
-                    coinprices = pd.concat([coinprices, tmp[['close']]])
-
-        if coinprices.empty:
-            return None, f"No data available for {pair} from {date(2020, 1, 1)} to {date.today()}"
-
-        coinprices.index = pd.to_datetime(coinprices.index)
-        coinprices = coinprices.ffill()
-        
-        return coinprices, None
-    
-    except Exception as e:
-        return None, str(e)
-
-# Function to prepare data for LightGBM
 def prepare_data(data, time_step=100):
     try:
         scaler = MinMaxScaler(feature_range=(0, 1))
@@ -85,7 +59,6 @@ def prepare_data(data, time_step=100):
         st.error(f"Error preparing data: {e}")
         return None, None, None
 
-# Function to make future predictions
 def predict_future(model, data, scaler, time_step=100, steps=120):
     try:
         data = scaler.transform(data)
@@ -115,20 +88,20 @@ if crypto_options:
     st.header("Available Cryptocurrencies")
 
     cryptos = st.selectbox('Select Coin', crypto_options)
-    currency = st.selectbox('Select Currency', ['EUR', 'USD', 'USDT', 'GBP', 'JPY', 'KRW'])
+    currency = st.selectbox('Select Currency', ['USD', 'EUR', 'GBP', 'JPY', 'KRW'])
 
     if cryptos and currency and st.button('Show Predictions'):
         st.header(f'{cryptos}-{currency}')
         st.write(f"Fetching data for {cryptos}-{currency}...")
 
         # Fetch the data based on user selection
-        coinprices, error = get_data(cryptos, currency)
-        if coinprices is not None:
+        coinprices = fetch_data(cryptos.lower(), date(2020, 1, 1), date.today())
+        if not coinprices.empty:
             if mode == 'Historical Data':
                 fig = px.line(
-                    x=coinprices.index, y=coinprices['close'],
-                    labels={"x": "Date", "y": "Price"},
-                    title=f'{cryptos}-{currency} Historical Prices'
+                    x=coinprices.index, y=coinprices['price'],
+                    labels={"x": "Date", "y": "Price (USD)"},
+                    title=f'{cryptos} Historical Prices'
                 )
                 fig.update_layout(
                     template='plotly_dark',
@@ -140,7 +113,7 @@ if crypto_options:
                     yaxis=dict(
                         gridcolor='rgb(75, 75, 75)',
                         tickfont=dict(color='white'),
-                        title=dict(text='Price', font=dict(color='white'))
+                        title=dict(text='Price (USD)', font=dict(color='white'))
                     ),
                     plot_bgcolor='rgba(0,0,0,0)',
                     paper_bgcolor='rgba(0,0,0,0)',
@@ -149,7 +122,7 @@ if crypto_options:
                 st.plotly_chart(fig)
 
             elif mode == 'Future Predictions':
-                data = coinprices['close'].values.reshape(-1, 1)
+                data = coinprices['price'].values.reshape(-1, 1)
                 X, y, scaler = prepare_data(data)
 
                 if X is not None and y is not None and scaler is not None:
@@ -163,7 +136,7 @@ if crypto_options:
 
                         if future_predictions is not None:
                             future_dates = pd.date_range(start=coinprices.index[-1], periods=len(future_predictions)+1, freq='D')[1:]
-                            historical_prices = coinprices['close'].values.flatten()
+                            historical_prices = coinprices['price'].values.flatten()
                             combined_prices = np.concatenate((historical_prices, future_predictions))
 
                             combined_dates = pd.Index(list(coinprices.index) + list(future_dates))
@@ -171,8 +144,8 @@ if crypto_options:
                             fig = px.line(
                                 x=combined_dates,
                                 y=combined_prices,
-                                labels={"x": "Date", "y": "Price"},
-                                title=f'{cryptos}-{currency} Price Prediction'
+                                labels={"x": "Date", "y": "Price (USD)"},
+                                title=f'{cryptos} Price Prediction'
                             )
                             fig.update_layout(
                                 template='plotly_dark',
@@ -184,7 +157,7 @@ if crypto_options:
                                 yaxis=dict(
                                     gridcolor='rgb(75, 75, 75)',
                                     tickfont=dict(color='white'),
-                                    title=dict(text='Price', font=dict(color='white'))
+                                    title=dict(text='Price (USD)', font=dict(color='white'))
                                 ),
                                 plot_bgcolor='rgba(0,0,0,0)',
                                 paper_bgcolor='rgba(0,0,0,0)',
@@ -196,6 +169,6 @@ if crypto_options:
                     except Exception as e:
                         st.error(f"Error during model training or prediction: {e}")
         else:
-            st.error(error)
+            st.error(f"Failed to fetch data for {cryptos}")
 else:
     st.error("No cryptocurrency options available.")
