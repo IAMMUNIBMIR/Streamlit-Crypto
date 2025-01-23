@@ -49,7 +49,7 @@ def fetch_data(crypto_symbol, start_date, end_date, symbol_to_id):
             st.error(f"Invalid cryptocurrency symbol: {crypto_symbol}")
             return pd.DataFrame()
 
-        # Ensure that start_date and end_date are datetime objects
+        # Ensure that start_date and end_date are datetime objects (convert date to datetime)
         start_date = datetime.combine(start_date, datetime.min.time())
         end_date = datetime.combine(end_date, datetime.min.time())
 
