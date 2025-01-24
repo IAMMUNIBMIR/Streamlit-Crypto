@@ -18,7 +18,7 @@ def get_available_currencies():
     try:
         # Fetch the top 200 coins by market cap in two pages (100 per page)
         coins = []
-        for page in range(1, 2):  # Page 1 and Page 2 for a total of 200 coins
+        for page in range(1, 3):  # Page 1 and Page 2 for a total of 200 coins
             coins.extend(
                 cg.get_coins_markets(vs_currency='usd', order='market_cap_desc', per_page=100, page=page)
             )
