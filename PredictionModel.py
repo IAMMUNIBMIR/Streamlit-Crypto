@@ -13,34 +13,22 @@ st.title('Cryptocurrency Price Prediction')
 # Initialize the CoinGecko API client
 cg = CoinGeckoAPI()
 
-# Function to get all available cryptocurrencies from CoinGecko and clean the list
+# Function to get all valid cryptocurrency pairs from CoinGecko
 def get_available_currencies():
     try:
         # Fetch the list of coins from CoinGecko
         coins = cg.get_coins_list()
-        
-        # Mapping cryptocurrency symbols to CoinGecko's internal IDs
-        symbol_to_id = {
-            'BTC': 'bitcoin',
-            'ETH': 'ethereum',
-            'LTC': 'litecoin',
-            'XRP': 'ripple',
-            'ADA': 'cardano',
-            'DOGE': 'dogecoin',
-            'SOL': 'solana',
-            'LINK': 'chainlink',
-            'DOT': 'polkadot',
-            'UNI': 'uniswap'
-        }
-        
-        # Extract the list of main cryptocurrencies (without duplicates)
-        crypto_options = list(symbol_to_id.keys())
-        
-        return sorted(crypto_options), symbol_to_id
+
+        # Generate a mapping of coin symbols to their respective CoinGecko IDs
+        symbol_to_id = {coin['symbol'].upper(): coin['id'] for coin in coins}
+
+        # Return sorted list of symbols and the mapping
+        return sorted(symbol_to_id.keys()), symbol_to_id
     except Exception as e:
         st.error(f"Error fetching cryptocurrencies: {e}")
         return [], {}
 
+# Function to fetch historical data for the selected cryptocurrency
 def fetch_data(crypto_symbol, start_date, end_date, symbol_to_id):
     try:
         # Use the symbol_to_id mapping to get the correct CoinGecko ID
@@ -63,6 +51,7 @@ def fetch_data(crypto_symbol, start_date, end_date, symbol_to_id):
         st.error(f"Error fetching data: {e}")
         return pd.DataFrame()
 
+# Prepare data for model training
 def prepare_data(data, time_step=100):
     try:
         scaler = MinMaxScaler(feature_range=(0, 1))
@@ -78,6 +67,7 @@ def prepare_data(data, time_step=100):
         st.error(f"Error preparing data: {e}")
         return None, None, None
 
+# Predict future prices
 def predict_future(model, data, scaler, time_step=100, steps=120):
     try:
         data = scaler.transform(data)
